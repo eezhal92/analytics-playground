@@ -18,7 +18,6 @@ const ProductList = app.component('ProductList', {
 
     function addToCart(product) {
       cart.value.push(product)
-      fbq('track', 'AddToCart', {currency: "IDR", value: product.price});
     }
 
     return { products, cart, addToCart }
