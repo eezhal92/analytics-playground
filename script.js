@@ -37,6 +37,7 @@ const ProductList = app.component('ProductList', {
 
     <button class="TR-checkout">Checkout</button>
     <button class="TR-purchase">Purchase</button>
+    <button class="TR-purchase-2">Purchase 2</button>
   </div>
   `
 })
