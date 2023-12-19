@@ -1,4 +1,4 @@
-const { createApp, ref } = Vue
+const { createApp, computed, ref } = Vue
 
 const app = createApp({
   setup() {
@@ -11,20 +11,37 @@ const app = createApp({
 const ProductList = app.component('ProductList', {
   setup() {
     const products = ref([
-      { id: 123, title: 'Product A', price: 8000 },
+      { id: 123, title: 'Product A', price: 400 },
       { id: 456, title: 'Product B', price: 200 }
     ])
     const cart = ref([])
 
     function addToCart(product) {
-      cart.value.push(product)
+      const index = cart.value.findIndex(el => el.id == product.id)
+      const isExists = index !== -1;
+      if (!isExists) {
+        cart.value.push({ ...product, qty: 1 })
+      } else {
+        cart.value[index].qty += 1
+      }
     }
 
-    return { products, cart, addToCart }
+    const qty = computed(() => cart.value.reduce((acc, item) => acc + item.qty, 0))
+    const total = computed(() => cart.value.reduce((acc, item) => acc + (item.qty * item.price), 0))
+
+    function purchase() {
+      window.dataLayer.push({
+        event: 'PurchaseDL',
+        currency: 'IDR',
+        value: total.value,
+      })
+    }
+
+    return { products, total, cart, qty, addToCart, purchase }
   },
   template: `
   <div>
-    <p>Cart ({{ cart.length }})</p>
+    <p>Cart qty: ({{ qty }}), total: {{ total }} </p>
     <h2>Products</h2>
     <div style="display: flex; gap: 1rem">
       <div style="padding: 0.5rem;" v-for="product in products" :key="product.id">
@@ -37,7 +54,8 @@ const ProductList = app.component('ProductList', {
 
     <button class="TR-checkout">Checkout</button>
     <button class="TR-purchase">Purchase</button>
-    <button class="TR-purchase-2">Purchase 2</button>
+    <button class="TR-purchase-2">Purchase Fancy</button>
+    <button @click="purchase()" class="TR-purchase-dl">Purchase Datalayer</button>
   </div>
   `
 })
