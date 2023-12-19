@@ -24,14 +24,19 @@ const ProductList = app.component('ProductList', {
       } else {
         cart.value[index].qty += 1
       }
+
+      gtag('event', 'AddToCart', {
+        currency: 'IDR',
+        value: product.price,
+        qty: 1,
+      })
     }
 
     const qty = computed(() => cart.value.reduce((acc, item) => acc + item.qty, 0))
     const total = computed(() => cart.value.reduce((acc, item) => acc + (item.qty * item.price), 0))
 
     function purchase() {
-      window.dataLayer.push({
-        event: 'PurchaseDL',
+      gtag('event', 'PurchaseDL', {
         currency: 'IDR',
         value: total.value,
       })
