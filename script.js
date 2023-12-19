@@ -1,4 +1,4 @@
-const { createApp, computed, ref } = Vue
+const { createApp, computed, ref, toRaw } = Vue
 
 const app = createApp({
   setup() {
@@ -20,11 +20,24 @@ function makeid(length) {
   return result;
 }
 
+const api = {
+  finalizeCheckout() {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve();
+      }, 500);
+    })
+  }
+}
+
 const ProductList = app.component('ProductList', {
   setup() {
+    const isCheckout = ref(false);
+    const city = ref('');
     const products = ref([
       { id: 123, title: 'Product A', price: 400 },
-      { id: 456, title: 'Product B', price: 200 }
+      { id: 456, title: 'Product B', price: 200 },
+      { id: 789, title: 'Product C', price: 320 }
     ])
     const cart = ref([])
 
@@ -32,48 +45,109 @@ const ProductList = app.component('ProductList', {
       const index = cart.value.findIndex(el => el.id == product.id)
       const isExists = index !== -1;
       if (!isExists) {
-        cart.value.push({ ...product, qty: 1 })
+        cart.value.push({ ...product, quantity: 1 })
       } else {
-        cart.value[index].qty += 1
+        cart.value[index].quantity += 1
       }
 
-      gtag('event', 'AddToCart', {
-        'x-fb-event-id': makeid(),
+      const data = {
         currency: 'IDR',
         value: product.price,
-        qty: 1,
+        contents: JSON.stringify([{
+          quantity: 1,
+          title: product.title,
+          id: product.id,
+          price: product.price,
+        }]),
         user_data: {
-          email_address: 'm.google@gmail.com'
+          email_address: 'm.google@gmail.com',
+          address: { city: city.value }
         }
+      }
+      gtag('event', 'AddToCartDL', {
+        'x-fb-event-id': makeid(),
+        ...data,
       })
     }
 
-    const qty = computed(() => cart.value.reduce((acc, item) => acc + item.qty, 0))
-    const total = computed(() => cart.value.reduce((acc, item) => acc + (item.qty * item.price), 0))
+    const email = 'foobar@gmail.com';
+    const currency = 'IDR';
+    const totalQty = computed(() => cart.value.reduce((acc, item) => acc + item.quantity, 0))
+    const total = computed(() => cart.value.reduce((acc, item) => acc + (item.quantity * item.price), 0))
+
+    // FB events: AddToCart, InitiateCheckout, Purchase
+    // Data layout events: AddToCartDL, InitiateCheckoutDL, PurchaseDL
+
+    const checkoutMeta = computed(() => ({
+      currency,
+      value: total.value,
+      contents: JSON.stringify(cart.value.map(el => ({
+        id: el.id,
+        title: el.title,
+        price: el.price,
+        quantity: el.quantity,
+      }))),
+      user_data: {
+        email_address: email,
+        address: { city: city.value },
+      }
+    }))
+
+    function checkout() {
+      if (!total.value) return;
+
+      isCheckout.value = true;
+      const data = toRaw(checkoutMeta.value)
+      gtag('event', 'InitiateCheckoutDL', {
+        'x-fb-event-id': makeid(),
+        ...data,
+      })
+    }
 
     function purchase() {
-      gtag('event', 'PurchaseDL', {
-        'x-fb-event-id': makeid(),
-        currency: 'IDR',
-        value: total.value,
-        user_data: {
-          email_address: 'm.google@gmail.com'
-        }
-      })
+      api.finalizeCheckout()
+        .then(() => {
+          const data = toRaw(checkoutMeta.value)
+          gtag('event', 'PurchaseDL', {
+            'x-fb-event-id': makeid(),
+            ...data,
+          })
+        })
+        .finally(() => {
+          isCheckout.value = false;
+        })
     }
 
-    function dosomething() {
-      gtag('event', 'Something', {
-        'x-fb-event-id': makeid(),
-        data: 'HEHE',
-      })
-    }
 
-    return { products, total, dosomething, cart, qty, addToCart, purchase }
+    return { isCheckout, city, products, total, cart, totalQty, checkout, addToCart, purchase }
   },
   template: `
   <div>
-    <p>Cart qty: ({{ qty }}), total: {{ total }} </p>
+    <h2>Your Cart</h2>
+    <p>Total: {{ total }} </p>
+
+    <table>
+      <thead>
+        <tr>
+          <td>ID</td>
+          <td>Title</td>
+          <td>Qty</td>
+          <td>Price</td>
+          <td>Total</td>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="product in cart" :key="product.id">
+          <td>{{ product.id }}</td>
+          <td>{{ product.title }}</td>
+          <td>{{ product.quantity }}</td>
+          <td>{{ product.price }}</td>
+          <td>{{ product.price * product.quantity }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <hr />
     <h2>Products</h2>
     <div style="display: flex; gap: 1rem">
       <div style="padding: 0.5rem;" v-for="product in products" :key="product.id">
@@ -84,11 +158,19 @@ const ProductList = app.component('ProductList', {
       </div>
     </div>
 
-    <button class="TR-checkout">Checkout</button>
-    <button class="TR-purchase">Purchase</button>
-    <button class="TR-purchase-2">Purchase Fancy</button>
-    <button @click="purchase()" class="TR-purchase-dl">Purchase Datalayer</button>
-    <button @click="dosomething()">DO STH</button>
+
+    <button @click="checkout()">Checkout</button>
+
+
+    <template v-if="isCheckout">
+    <form @submit.prevent="purchase()">
+      <div>
+        <label>Address</label>
+        <textarea v-model="city" />
+      </div>
+      <button type="submit" class="TR-purchase-dl">Purchase</button>
+    </form>
+    </template>
   </div>
   `
 })
