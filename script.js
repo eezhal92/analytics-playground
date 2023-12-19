@@ -8,6 +8,18 @@ const app = createApp({
   },
 });
 
+function makeid(length) {
+  let result = '';
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const charactersLength = characters.length;
+  let counter = 0;
+  while (counter < length) {
+    result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    counter += 1;
+  }
+  return result;
+}
+
 const ProductList = app.component('ProductList', {
   setup() {
     const products = ref([
@@ -26,9 +38,13 @@ const ProductList = app.component('ProductList', {
       }
 
       gtag('event', 'AddToCart', {
+        'x-fb-event-id': makeid(),
         currency: 'IDR',
         value: product.price,
         qty: 1,
+        user_data: {
+          email_address: 'm.google@gmail.com'
+        }
       })
     }
 
@@ -37,12 +53,23 @@ const ProductList = app.component('ProductList', {
 
     function purchase() {
       gtag('event', 'PurchaseDL', {
+        'x-fb-event-id': makeid(),
         currency: 'IDR',
         value: total.value,
+        user_data: {
+          email_address: 'm.google@gmail.com'
+        }
       })
     }
 
-    return { products, total, cart, qty, addToCart, purchase }
+    function dosomething() {
+      gtag('event', 'Something', {
+        'x-fb-event-id': makeid(),
+        data: 'HEHE',
+      })
+    }
+
+    return { products, total, dosomething, cart, qty, addToCart, purchase }
   },
   template: `
   <div>
@@ -61,6 +88,7 @@ const ProductList = app.component('ProductList', {
     <button class="TR-purchase">Purchase</button>
     <button class="TR-purchase-2">Purchase Fancy</button>
     <button @click="purchase()" class="TR-purchase-dl">Purchase Datalayer</button>
+    <button @click="dosomething()">DO STH</button>
   </div>
   `
 })
