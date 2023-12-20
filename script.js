@@ -34,6 +34,7 @@ const ProductList = app.component('ProductList', {
   setup() {
     const isCheckout = ref(false);
     const city = ref('');
+    const isShowCart = ref(false);
     const products = ref([
       { id: 123, title: 'Product A', price: 400 },
       { id: 456, title: 'Product B', price: 200 },
@@ -53,7 +54,7 @@ const ProductList = app.component('ProductList', {
       const data = {
         currency: 'IDR',
         value: product.price,
-        contents: JSON.stringify([{
+        items: JSON.stringify([{
           quantity: 1,
           title: product.title,
           id: product.id,
@@ -64,8 +65,9 @@ const ProductList = app.component('ProductList', {
           address: { city: city.value }
         }
       }
+      const eventId = makeid()
       gtag('event', 'AddToCartDL', {
-        'x-fb-event-id': makeid(),
+        'x-fb-event-id': eventId,
         ...data,
       })
     }
@@ -78,30 +80,47 @@ const ProductList = app.component('ProductList', {
     // FB events: AddToCart, InitiateCheckout, Purchase
     // Data layout events: AddToCartDL, InitiateCheckoutDL, PurchaseDL
 
-    const checkoutMeta = computed(() => ({
-      currency,
-      value: total.value,
-      contents: JSON.stringify(cart.value.map(el => ({
+    const checkoutMeta = computed(() => {
+      const items = cart.value.map(el => ({
         id: el.id,
         title: el.title,
         price: el.price,
         quantity: el.quantity,
-      }))),
-      user_data: {
-        email_address: email,
-        address: { city: city.value },
+      }));
+      return {
+        currency,
+        value: total.value,
+        items,
+        contents: JSON.stringify(items),
+        user_data: {
+          email_address: email,
+          address: { city: city.value },
+        }
       }
-    }))
+    })
 
     function checkout() {
       if (!total.value) return;
 
       isCheckout.value = true;
       const data = toRaw(checkoutMeta.value)
+      const eventId = makeid();
       gtag('event', 'InitiateCheckoutDL', {
-        'x-fb-event-id': makeid(),
+        'x-fb-event-id': eventId,
         ...data,
       })
+    }
+
+    function viewCart() {
+      isShowCart.value = !isShowCart.value
+
+      if (isShowCart.value) {
+        gtag('event', 'view_cart', {
+          currency,
+          items: cart.value,
+          value: total.value,
+        })
+      }
     }
 
     function purchase() {
@@ -119,14 +138,16 @@ const ProductList = app.component('ProductList', {
     }
 
 
-    return { isCheckout, city, products, total, cart, totalQty, checkout, addToCart, purchase }
+    return { isCheckout, isShowCart, viewCart, city, products, total, cart, totalQty, checkout, addToCart, purchase }
   },
   template: `
   <div>
     <h2>Your Cart</h2>
     <p>Total: {{ total }} </p>
 
-    <table>
+    <button @click="viewCart">View Cart</button>
+
+    <table v-show="isShowCart">
       <thead>
         <tr>
           <td>ID</td>
