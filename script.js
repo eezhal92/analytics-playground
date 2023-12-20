@@ -8,6 +8,10 @@ const app = createApp({
   },
 });
 
+function createTrxID() {
+  return `trx_${makeid()}`
+}
+
 function makeid(length) {
   let result = '';
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -30,6 +34,49 @@ const api = {
   }
 }
 
+app.component('Product', {
+  props: ['product'],
+  setup(props) {
+    const isShowDetail = ref(false);
+
+    function toggleShowDetail() {
+      isShowDetail.value = !isShowDetail.value
+
+      if (isShowDetail.value) {
+        console.log('hei')
+        const items = [
+          {
+            id: props.product.id,
+            item_id: props.product.id,
+            item_name: props.product.title,
+            quantity: 1
+          }
+        ]
+        gtag('event', 'ViewItemDL', {
+          currency: 'IDR',
+          value: props.product.price,
+          items,
+          contents: JSON.stringify(items),
+        })
+      }
+    }
+
+    return { isShowDetail, toggleShowDetail }
+  },
+  template: `
+  <div style="padding: 0.5rem; width: 180px">
+    <p>Title: {{product.title}}</p>
+    <p>Rp. {{product.price}}</p>
+    <button @click="toggleShowDetail">View</button>
+    <div v-show="isShowDetail">
+      <hr />
+      <p>Lorem ipsum sit amet</p>
+      <button @click="$emit('add-to-cart')">Add To Cart</button>
+    </div>
+  </div>
+  `
+})
+
 const ProductList = app.component('ProductList', {
   setup() {
     const isCheckout = ref(false);
@@ -51,15 +98,18 @@ const ProductList = app.component('ProductList', {
         cart.value[index].quantity += 1
       }
 
+      const items = [{
+        id: product.id,
+        item_id: product.id,
+        item_name: product.title,
+        price: product.price,
+        quantity: 1,
+      }]
       const data = {
         currency: 'IDR',
         value: product.price,
-        items: JSON.stringify([{
-          quantity: 1,
-          title: product.title,
-          id: product.id,
-          price: product.price,
-        }]),
+        items,
+        contents: JSON.stringify(items),
         user_data: {
           email_address: 'm.google@gmail.com',
           address: { city: city.value }
@@ -83,7 +133,8 @@ const ProductList = app.component('ProductList', {
     const checkoutMeta = computed(() => {
       const items = cart.value.map(el => ({
         id: el.id,
-        title: el.title,
+        item_id: el.id,
+        item_name: el.title,
         price: el.price,
         quantity: el.quantity,
       }));
@@ -115,9 +166,15 @@ const ProductList = app.component('ProductList', {
       isShowCart.value = !isShowCart.value
 
       if (isShowCart.value) {
-        gtag('event', 'view_cart', {
+        const items = cart.value.map(el => ({
+          item_id: el.id,
+          item_name: el.title,
+          price: el.price,
+          quantity: el.quantity,
+        }))
+        gtag('event', 'ViewCartDL', {
           currency,
-          items: cart.value,
+          contents: JSON.stringify(items),
           value: total.value,
         })
       }
@@ -129,6 +186,7 @@ const ProductList = app.component('ProductList', {
           const data = toRaw(checkoutMeta.value)
           gtag('event', 'PurchaseDL', {
             'x-fb-event-id': makeid(),
+            transaction_id: createTrxID(),
             ...data,
           })
         })
@@ -142,6 +200,7 @@ const ProductList = app.component('ProductList', {
   },
   template: `
   <div>
+
     <h2>Your Cart</h2>
     <p>Total: {{ total }} </p>
 
@@ -169,29 +228,29 @@ const ProductList = app.component('ProductList', {
     </table>
 
     <hr />
-    <h2>Products</h2>
-    <div style="display: flex; gap: 1rem">
-      <div style="padding: 0.5rem;" v-for="product in products" :key="product.id">
-        <p>{{product.title}}</p>
-        <p>Rp. {{product.price}}</p>
 
-        <button class="add-to-cart" @click="addToCart(product)">Add To Cart</button>
+    <div class="main" style="display: flex">
+      <div class="left" style="flex-basis: 500px">
+        <h2>Products</h2>
+        <div style="display: flex; gap: 1rem">
+          <product v-for="product in products" :product="product" :key="product.id" @add-to-cart="addToCart(product)" />
+        </div>
+      </div>
+
+      <div class="right">
+        <button @click="checkout()">Checkout</button>
+
+        <template v-if="isCheckout">
+        <form @submit.prevent="purchase()">
+          <div>
+            <label>Address</label>
+            <textarea v-model="city" />
+          </div>
+          <button type="submit" class="TR-purchase-dl">Purchase</button>
+        </form>
+        </template>
       </div>
     </div>
-
-
-    <button @click="checkout()">Checkout</button>
-
-
-    <template v-if="isCheckout">
-    <form @submit.prevent="purchase()">
-      <div>
-        <label>Address</label>
-        <textarea v-model="city" />
-      </div>
-      <button type="submit" class="TR-purchase-dl">Purchase</button>
-    </form>
-    </template>
   </div>
   `
 })
