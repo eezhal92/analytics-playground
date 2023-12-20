@@ -9,7 +9,7 @@ const app = createApp({
 });
 
 function createTrxID() {
-  return `trx_${makeid()}`
+  return `trx_${makeid(10)}`
 }
 
 function makeid(length) {
@@ -88,6 +88,16 @@ const ProductList = app.component('ProductList', {
       { id: 789, title: 'Product C', price: 320 }
     ])
     const cart = ref([])
+
+    function handleTest() {
+      gtag('event', 'view_item', {
+        currency: 'IDR',
+        items: JSON.stringify([
+          { item_id: 123, item_name: 'Awesome', quantity: 1, price: 90000 }
+        ]),
+        value: 90000,
+      })
+    }
 
     function addToCart(product) {
       const index = cart.value.findIndex(el => el.id == product.id)
@@ -186,7 +196,7 @@ const ProductList = app.component('ProductList', {
           const data = toRaw(checkoutMeta.value)
           gtag('event', 'PurchaseDL', {
             'x-fb-event-id': makeid(),
-            transaction_id: createTrxID(),
+            transaction_id: createTrxID(10),
             ...data,
           })
         })
@@ -196,10 +206,14 @@ const ProductList = app.component('ProductList', {
     }
 
 
-    return { isCheckout, isShowCart, viewCart, city, products, total, cart, totalQty, checkout, addToCart, purchase }
+    return { isCheckout, isShowCart, handleTest, viewCart, city, products, total, cart, totalQty, checkout, addToCart, purchase }
   },
   template: `
   <div>
+    <h2>Admin</h2>
+    <admin-app />
+    <hr />
+
 
     <h2>Your Cart</h2>
     <p>Total: {{ total }} </p>
@@ -231,6 +245,7 @@ const ProductList = app.component('ProductList', {
 
     <div class="main" style="display: flex">
       <div class="left" style="flex-basis: 500px">
+        <button @click="handleTest">Test</button>
         <h2>Products</h2>
         <div style="display: flex; gap: 1rem">
           <product v-for="product in products" :product="product" :key="product.id" @add-to-cart="addToCart(product)" />
@@ -253,6 +268,50 @@ const ProductList = app.component('ProductList', {
     </div>
   </div>
   `
+})
+
+const AdminApp = app.component('AdminApp', {
+  setup() {
+    const orderID = ref('');
+    const userID = ref('usr_' + makeid(10));
+
+
+    function createOrder() {
+      orderID.value = 'ord_' + makeid(10);
+
+      gtag('event', 'OrderCreated', {
+        order_id: orderID.value,
+        user_id: userID.value,
+      })
+    }
+
+    function confirmPayment() {
+      if (!orderID.value) return
+      gtag('event', 'PaymentConfirmed', {
+        order_id: orderID.value,
+        user_id: userID.value,
+      })
+    }
+
+    function markServiceDone() {
+      if (!orderID.value) return
+      gtag('event', 'ServiceDone', {
+        order_id: orderID.value,
+        user_id: userID.value,
+      })
+      orderID.value = ''
+    }
+
+    return { userID, orderID, createOrder, confirmPayment, markServiceDone }
+  },
+  template: `<div>
+    <p>user id: {{ userID }}</p>
+    <p>order id: {{ orderID }}</p>
+
+    <button @click="createOrder()">Create Order</button>
+    <button @click="confirmPayment()">Confirm Payment</button>
+    <button @click="markServiceDone()">Mark Service Done</button>
+  </div>`
 })
 
 app.mount('#app')
